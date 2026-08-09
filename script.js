@@ -1,4 +1,5 @@
-(function(){const canvas=document.getElementById('boardCanvas');const ctx=canvas.getContext('2d');const padding=20;const cellSize=48;const colLetters=['a','b','c','d','e','f','g','h','i'];const ITEMS_PER_PAGE=8;let sfxCtx=null;let sfxEnabled=!0;function getSfxCtx(){if(!sfxEnabled)return null;if(!sfxCtx){try{sfxCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){sfxCtx=null}}
+(function(){
+const canvas=document.getElementById('boardCanvas');const ctx=canvas.getContext('2d');const padding=20;const cellSize=48;const colLetters=['a','b','c','d','e','f','g','h','i'];const ITEMS_PER_PAGE=8;let sfxCtx=null;let sfxEnabled=!0;function getSfxCtx(){if(!sfxEnabled)return null;if(!sfxCtx){try{sfxCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){sfxCtx=null}}
 if(sfxCtx&&sfxCtx.state==='suspended')sfxCtx.resume();return sfxCtx}
 function sfxTone(ctx,t0,freq,endFreq,duration,type,peak){const osc=ctx.createOscillator();const gain=ctx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,t0);if(endFreq)osc.frequency.exponentialRampToValueAtTime(endFreq,t0+duration*0.9);gain.gain.setValueAtTime(0,t0);gain.gain.linearRampToValueAtTime(peak,t0+0.012);gain.gain.exponentialRampToValueAtTime(0.001,t0+duration);osc.connect(gain);gain.connect(ctx.destination);osc.start(t0);osc.stop(t0+duration+0.03);return{osc,gain}}
 function sfxNoiseBurst(ctx,t0,duration,filterType,filterFreq,peak,q){const bufSize=Math.max(1,Math.floor(ctx.sampleRate*duration));const buffer=ctx.createBuffer(1,bufSize,ctx.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<bufSize;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/bufSize,1.4);const noise=ctx.createBufferSource();noise.buffer=buffer;const filter=ctx.createBiquadFilter();filter.type=filterType;filter.frequency.setValueAtTime(filterFreq,t0);if(q)filter.Q.setValueAtTime(q,t0);const gain=ctx.createGain();gain.gain.setValueAtTime(peak,t0);gain.gain.exponentialRampToValueAtTime(0.001,t0+duration);noise.connect(filter);filter.connect(gain);gain.connect(ctx.destination);noise.start(t0);noise.stop(t0+duration+0.02)}
@@ -12,32 +13,39 @@ const translations={en:{pageTitle:'Barricade - Dark Mode',aboutBtn:'About',langB
 function fmt(str,params){return str.replace(/\{(\w+)\}/g,(m,k)=>(params[k]!==undefined?params[k]:m))}
 function setTextContent(elId,text){const el=document.getElementById(elId);if(el)el.textContent=text}
 function escapeHTML(str){return String(str).replace(/[&<>"]/g,function(m){if(m==='&')return'&amp;';if(m==='<')return'&lt;';if(m==='>')return'&gt;';if(m==='"')return'&quot;';return m})}
-const startOverlay=document.getElementById('start-overlay');const appEl=document.getElementById('app');const topbarEl=document.getElementById('topbar');const boardWrapper=document.getElementById('board-wrapper');const btnMove=document.getElementById('btn-move');const btnHWall=document.getElementById('btn-hwall');const btnVWall=document.getElementById('btn-vwall');const btnUndo=document.getElementById('btn-undo');const btnRepeat=document.getElementById('btn-repeat');const btnResign=document.getElementById('btn-resign');const btnHome=document.getElementById('btn-home');const historyList=document.getElementById('history-list');const statusText=document.getElementById('status-text');const infoMode=document.getElementById('info-mode');const infoWalls=document.getElementById('info-walls');const infoObjective=document.getElementById('info-objective');const wallConfirmPopup=document.getElementById('wall-confirm-popup');const wallConfirmYes=document.getElementById('wall-confirm-yes');const wallConfirmNo=document.getElementById('wall-confirm-no');const gameOverOverlay=document.getElementById('game-over-overlay');const goWinnerName=document.getElementById('go-winner-name');const goNameWinner=document.getElementById('go-name-winner');const goNameLoser=document.getElementById('go-name-loser');const btnGoRepeat=document.getElementById('btn-go-repeat');const btnGoHome=document.getElementById('btn-go-home');let gameMode='2p';let players=[];let turnOrder=[];let turnIndex=0;let turn=0;let hWalls=Array.from({length:9},()=>Array(9).fill(!1));let vWalls=Array.from({length:9},()=>Array(9).fill(!1));let uiMode='move';let gameOver=!1;let history=[];let undoStack=[];let currentPage=0;let isAnimating=!1;let animData=null;let wallAnimation=null;let wallPreviewPos=null;let pendingWallPos=null;let selectedMode='2p';let currentNames={p1:localStorage.getItem('barricade-name-p1')||'',p2:localStorage.getItem('barricade-name-p2')||'',red:localStorage.getItem('barricade-name-red')||'',blue:localStorage.getItem('barricade-name-blue')||'',green:localStorage.getItem('barricade-name-green')||'',yellow:localStorage.getItem('barricade-name-yellow')||''};const CUSTOM_COLORS=['#ff3b30','#007aff','#34c759','#ffcc00','#af52de','#ff9500','#00c7be','#ff2d55'];const GRADIENT_PRESETS=[['#ff3b30','#ffcc00'],['#007aff','#00c7be'],['#af52de','#ff2d55'],['#34c759','#00c7be'],['#ff9500','#ff2d55'],['#007aff','#af52de']];const CUSTOM_SHAPES=['circle','square','diamond','triangle','star'];const DEFAULT_COLOR_FOR={p1:'#ff3b30',p2:'#007aff',red:'#ff3b30',blue:'#007aff',green:'#34c759',yellow:'#ffcc00'};function loadCustom(slot){try{return JSON.parse(localStorage.getItem('barricade-custom-'+slot))||{}}catch(e){return{}}}
+const startOverlay=document.getElementById('start-overlay');const appEl=document.getElementById('app');const topbarEl=document.getElementById('topbar');const boardWrapper=document.getElementById('board-wrapper');const btnMove=document.getElementById('btn-move');const btnHWall=document.getElementById('btn-hwall');const btnVWall=document.getElementById('btn-vwall');const btnUndo=document.getElementById('btn-undo');const btnRepeat=document.getElementById('btn-repeat');const btnResign=document.getElementById('btn-resign');const btnHome=document.getElementById('btn-home');const historyList=document.getElementById('history-list');const statusText=document.getElementById('status-text');const infoMode=document.getElementById('info-mode');const infoWalls=document.getElementById('info-walls');const infoObjective=document.getElementById('info-objective');const wallConfirmPopup=document.getElementById('wall-confirm-popup');const wallConfirmYes=document.getElementById('wall-confirm-yes');const wallConfirmNo=document.getElementById('wall-confirm-no');const gameOverOverlay=document.getElementById('game-over-overlay');const goWinnerName=document.getElementById('go-winner-name');const goNameWinner=document.getElementById('go-name-winner');const goNameLoser=document.getElementById('go-name-loser');const btnGoRepeat=document.getElementById('btn-go-repeat');const btnGoHome=document.getElementById('btn-go-home');let gameMode='2p';let players=[];let turnOrder=[];let turnIndex=0;let turn=0;let hWalls=Array.from({length:9},()=>Array(9).fill(!1));let vWalls=Array.from({length:9},()=>Array(9).fill(!1));let uiMode='move';let gameOver=!1;let history=[];let undoStack=[];let currentPage=0;let isAnimating=!1;let animData=null;let wallAnimation=null;let wallPreviewPos=null;let pendingWallPos=null;let selectedMode='2p';let currentNames={p1:localStorage.getItem('barricade-name-p1')||'',p2:localStorage.getItem('barricade-name-p2')||'',red:localStorage.getItem('barricade-name-red')||'',blue:localStorage.getItem('barricade-name-blue')||'',green:localStorage.getItem('barricade-name-green')||'',yellow:localStorage.getItem('barricade-name-yellow')||''};const CUSTOM_COLORS=['#ff3b30','#007aff','#34c759','#ffcc00','#af52de','#ff9500','#00c7be','#ff2d55'];const GRADIENT_PRESETS=[['#ff3b30','#ffcc00'],['#007aff','#00c7be'],['#af52de','#ff2d55'],['#34c759','#00c7be'],['#ff9500','#ff2d55'],['#007aff','#af52de']];const CUSTOM_ICONS=['♔','♕','♖','♗','♘','♙'];const DEFAULT_COLOR_FOR={p1:'#ff3b30',p2:'#007aff',red:'#ff3b30',blue:'#007aff',green:'#34c759',yellow:'#ffcc00'};function loadCustom(slot){try{return JSON.parse(localStorage.getItem('barricade-custom-'+slot))||{}}catch(e){return{}}}
 let currentCustom={p1:loadCustom('p1'),p2:loadCustom('p2'),red:loadCustom('red'),blue:loadCustom('blue'),green:loadCustom('green'),yellow:loadCustom('yellow')};function customColor(slot){return(currentCustom[slot]&&currentCustom[slot].color)||DEFAULT_COLOR_FOR[slot]}
 function customGradientEnabled(slot){return!!(currentCustom[slot]&&currentCustom[slot].gradient&&currentCustom[slot].colorB)}
 function customColorB(slot){return(currentCustom[slot]&&currentCustom[slot].colorB)||customColor(slot)}
 function gradientBg(colorA,colorB,isGrad){return isGrad&&colorB?`linear-gradient(135deg, ${colorA}, ${colorB})`:colorA}
 function customBackground(slot){return gradientBg(customColor(slot),customColorB(slot),customGradientEnabled(slot))}
-function customShape(slot){return(currentCustom[slot]&&currentCustom[slot].shape)||'circle'}
-function setShapeClass(el,shape){CUSTOM_SHAPES.forEach(s=>el.classList.remove('shape-'+s));el.classList.add('shape-'+(shape||'circle'))}
-function refreshSwatchUI(slot){const avatarEl=document.getElementById('avatar-preview-'+slot);if(avatarEl){avatarEl.style.background=customBackground(slot);setShapeClass(avatarEl,customShape(slot))}
-const colorContainer=document.getElementById('swatches-'+slot);if(colorContainer)[...colorContainer.children].forEach(b=>{const sel=b.dataset.gradient==='1'?(customGradientEnabled(slot)&&b.dataset.colorA===customColor(slot)&&b.dataset.colorB===customColorB(slot)):(!customGradientEnabled(slot)&&b.dataset.color===customColor(slot));b.classList.toggle('selected',sel)});const shapeContainer=document.getElementById('shapes-'+slot);if(shapeContainer)[...shapeContainer.children].forEach(b=>b.classList.toggle('selected',b.dataset.shape===customShape(slot)))}
-function buildSwatches(slot){const colorContainer=document.getElementById('swatches-'+slot);const shapeContainer=document.getElementById('shapes-'+slot);if(!colorContainer||!shapeContainer)return;colorContainer.innerHTML='';shapeContainer.innerHTML='';if(!currentCustom[slot])currentCustom[slot]={};CUSTOM_COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='swatch-btn';b.style.background=c;b.dataset.color=c;b.onclick=()=>{currentCustom[slot].color=c;currentCustom[slot].gradient=false;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};colorContainer.appendChild(b)});GRADIENT_PRESETS.forEach(([a,bC])=>{const b=document.createElement('button');b.type='button';b.className='swatch-btn';b.style.background=`linear-gradient(135deg, ${a}, ${bC})`;b.dataset.gradient='1';b.dataset.colorA=a;b.dataset.colorB=bC;b.onclick=()=>{currentCustom[slot].color=a;currentCustom[slot].colorB=bC;currentCustom[slot].gradient=true;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};colorContainer.appendChild(b)});CUSTOM_SHAPES.forEach(s=>{const b=document.createElement('button');b.type='button';b.className='shape-btn shape-'+s;b.dataset.shape=s;b.onclick=()=>{currentCustom[slot].shape=s;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};shapeContainer.appendChild(b)});refreshSwatchUI(slot)}
+function customIcon(slot){return(currentCustom[slot]&&currentCustom[slot].icon)||'♙'}
+function refreshSwatchUI(slot){const avatarEl=document.getElementById('avatar-preview-'+slot);if(avatarEl){avatarEl.style.background=customBackground(slot);avatarEl.textContent=customIcon(slot)}
+const colorContainer=document.getElementById('swatches-'+slot);if(colorContainer)[...colorContainer.children].forEach(b=>{const sel=b.dataset.gradient==='1'?(customGradientEnabled(slot)&&b.dataset.colorA===customColor(slot)&&b.dataset.colorB===customColorB(slot)):(!customGradientEnabled(slot)&&b.dataset.color===customColor(slot));b.classList.toggle('selected',sel)});const iconContainer=document.getElementById('icons-'+slot);if(iconContainer)[...iconContainer.children].forEach(b=>b.classList.toggle('selected',b.dataset.icon===customIcon(slot)))}
+function buildSwatches(slot){const colorContainer=document.getElementById('swatches-'+slot);if(!colorContainer)return;colorContainer.innerHTML='';if(!currentCustom[slot])currentCustom[slot]={};CUSTOM_COLORS.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='swatch-btn';b.style.background=c;b.dataset.color=c;b.onclick=()=>{currentCustom[slot].color=c;currentCustom[slot].gradient=false;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};colorContainer.appendChild(b)});GRADIENT_PRESETS.forEach(([a,bC])=>{const b=document.createElement('button');b.type='button';b.className='swatch-btn';b.style.background=`linear-gradient(135deg, ${a}, ${bC})`;b.dataset.gradient='1';b.dataset.colorA=a;b.dataset.colorB=bC;b.onclick=()=>{currentCustom[slot].color=a;currentCustom[slot].colorB=bC;currentCustom[slot].gradient=true;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};colorContainer.appendChild(b)});refreshSwatchUI(slot)}
+function buildIcons(slot){const iconContainer=document.getElementById('icons-'+slot);if(!iconContainer)return;iconContainer.innerHTML='';if(!currentCustom[slot])currentCustom[slot]={};CUSTOM_ICONS.forEach(icon=>{const b=document.createElement('button');b.type='button';b.className='icon-btn';b.textContent=icon;b.dataset.icon=icon;b.onclick=()=>{currentCustom[slot].icon=icon;localStorage.setItem('barricade-custom-'+slot,JSON.stringify(currentCustom[slot]));refreshSwatchUI(slot)};iconContainer.appendChild(b)});refreshSwatchUI(slot)}
 function showToast(message){const container=document.getElementById('toast-container');if(!container)return;const el=document.createElement('div');el.className='toast';el.textContent=message;container.appendChild(el);requestAnimationFrame(()=>el.classList.add('show'));setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300)},2600)}
 function setLanguage(lang){currentLang=lang;localStorage.setItem('barricade-lang',lang);applyStaticTranslations();if(appEl.classList.contains('visible')){renderTopbar();updateBtnState();updateScores();updateActivePlayerUI();updateHistory();infoMode.textContent=gameMode==='2p'?t('mode2p'):t('mode4p');infoObjective.textContent=gameMode==='2p'?t('objective2p'):t('objective4p')}}
 function applyStaticTranslations(){setTextContent('page-title',t('pageTitle'));setTextContent('about-btn-label',t('aboutBtn'));setTextContent('lang-btn-label',t('langBtn'));setTextContent('about-title',t('aboutTitle'));setTextContent('about-text',t('aboutText'));setTextContent('about-creator-label',t('aboutCreatorLabel'));setTextContent('about-creator-name',t('aboutCreatorName'));setTextContent('btn-about-close',t('aboutClose'));setTextContent('start-subtitle',t('startSubtitle'));setTextContent('mode-2p-title',t('mode2pTitle'));setTextContent('mode-2p-desc',t('mode2pDesc'));setTextContent('mode-4p-title',t('mode4pTitle'));setTextContent('mode-4p-desc',t('mode4pDesc'));setTextContent('lbl-move',t('move'));setTextContent('lbl-hwall',t('horizontal'));setTextContent('lbl-vwall',t('vertical'));setTextContent('lbl-undo',t('undo'));setTextContent('lbl-repeat',t('repeat'));setTextContent('lbl-resign',t('resign'));setTextContent('lbl-home',t('newGame'));setTextContent('go-winner-label',t('goWinnerLabel'));setTextContent('go-tag-winner',t('goTagWinner'));setTextContent('go-tag-loser',t('goTagLoser'));setTextContent('lbl-go-repeat',t('goPlayAgain'));setTextContent('lbl-go-home',t('goBackHome'));setTextContent('lbl-move-history',t('moveHistory'));setTextContent('lbl-game-info',t('gameInfo'));setTextContent('lbl-mode',t('mode'));setTextContent('lbl-walls-left',t('wallsLeft'));setTextContent('lbl-status',t('status'));setTextContent('lbl-objective',t('objective'));setTextContent('lbl-walls',t('walls'));document.getElementById('info-walls-text').innerHTML=t('wallsText');setTextContent('lbl-rules',t('rules'));document.getElementById('info-rules-text').innerHTML=t('rulesText');setTextContent('lbl-place-wall',t('placeWall'));const startLbl=document.getElementById('lbl-start-game');if(startLbl)startLbl.textContent=t('startGame');setTextContent('name-entry-title',t('nameEntryTitle'));setTextContent('btn-name-confirm',t('startGameBtn'));setTextContent('btn-name-back',t('backBtn'));document.documentElement.lang=currentLang;document.documentElement.dir=currentLang==='fa'?'rtl':'ltr';updateLangSwitch()}
 function updateLangSwitch(){const sw=document.getElementById('lang-switch');if(!sw)return;sw.dataset.active=currentLang;const faBtn=document.getElementById('lang-opt-fa'),enBtn=document.getElementById('lang-opt-en');if(faBtn)faBtn.classList.toggle('active',currentLang==='fa');if(enBtn)enBtn.classList.toggle('active',currentLang==='en')}
-const langOptFa=document.getElementById('lang-opt-fa'),langOptEn=document.getElementById('lang-opt-en');if(langOptFa)langOptFa.onclick=()=>setLanguage('fa');if(langOptEn)langOptEn.onclick=()=>setLanguage('en');updateLangSwitch();document.getElementById('btn-about').onclick=()=>document.getElementById('about-overlay').classList.add('visible');document.getElementById('btn-about-close').onclick=()=>document.getElementById('about-overlay').classList.remove('visible');document.getElementById('about-overlay').addEventListener('click',(e)=>{if(e.target.id==='about-overlay')e.target.classList.remove('visible');});applyStaticTranslations();['p1','p2','red','blue','green','yellow'].forEach(buildSwatches);function setup2P(){players=[{id:0,name:'Player 1 (Red)',customName:currentNames.p1,color:customColor('p1'),colorB:customColorB('p1'),gradient:customGradientEnabled('p1'),shape:customShape('p1'),colorClass:'red',row:8,col:4,walls:10,target:'row0',team:0,finished:!1},{id:1,name:'Player 2 (Blue)',customName:currentNames.p2,color:customColor('p2'),colorB:customColorB('p2'),gradient:customGradientEnabled('p2'),shape:customShape('p2'),colorClass:'blue',row:0,col:4,walls:10,target:'row8',team:1,finished:!1},];turnOrder=[0,1]}
-function setup4P(){players=[{id:0,name:'Red',customName:currentNames.red,color:customColor('red'),colorB:customColorB('red'),gradient:customGradientEnabled('red'),shape:customShape('red'),colorClass:'red',row:0,col:2,walls:10,target:'row8',team:0,finished:!1},{id:1,name:'Blue',customName:currentNames.blue,color:customColor('blue'),colorB:customColorB('blue'),gradient:customGradientEnabled('blue'),shape:customShape('blue'),colorClass:'blue',row:0,col:6,walls:10,target:'row8',team:0,finished:!1},{id:2,name:'Green',customName:currentNames.green,color:customColor('green'),colorB:customColorB('green'),gradient:customGradientEnabled('green'),shape:customShape('green'),colorClass:'green',row:8,col:2,walls:10,target:'row0',team:1,finished:!1},{id:3,name:'Yellow',customName:currentNames.yellow,color:customColor('yellow'),colorB:customColorB('yellow'),gradient:customGradientEnabled('yellow'),shape:customShape('yellow'),colorClass:'yellow',row:8,col:6,walls:10,target:'row0',team:1,finished:!1},];turnOrder=[0,2,1,3]}
+const langOptFa=document.getElementById('lang-opt-fa'),langOptEn=document.getElementById('lang-opt-en');if(langOptFa)langOptFa.onclick=()=>setLanguage('fa');if(langOptEn)langOptEn.onclick=()=>setLanguage('en');updateLangSwitch();document.getElementById('btn-about').onclick=()=>document.getElementById('about-overlay').classList.add('visible');document.getElementById('btn-about-close').onclick=()=>document.getElementById('about-overlay').classList.remove('visible');document.getElementById('about-overlay').addEventListener('click',(e)=>{if(e.target.id==='about-overlay')e.target.classList.remove('visible');});applyStaticTranslations();['p1','p2','red','blue','green','yellow'].forEach(buildSwatches);['p1','p2','red','blue','green','yellow'].forEach(buildIcons);function setup2P(){players=[{id:0,name:'Player 1 (Red)',customName:currentNames.p1,color:customColor('p1'),colorB:customColorB('p1'),gradient:customGradientEnabled('p1'),icon:customIcon('p1'),colorClass:'red',row:8,col:4,walls:10,target:'row0',team:0,finished:!1},{id:1,name:'Player 2 (Blue)',customName:currentNames.p2,color:customColor('p2'),colorB:customColorB('p2'),gradient:customGradientEnabled('p2'),icon:customIcon('p2'),colorClass:'blue',row:0,col:4,walls:10,target:'row8',team:1,finished:!1},];turnOrder=[0,1]}
+function setup4P(){players=[{id:0,name:'Red',customName:currentNames.red,color:customColor('red'),colorB:customColorB('red'),gradient:customGradientEnabled('red'),icon:customIcon('red'),colorClass:'red',row:0,col:2,walls:10,target:'row8',team:0,finished:!1},{id:1,name:'Blue',customName:currentNames.blue,color:customColor('blue'),colorB:customColorB('blue'),gradient:customGradientEnabled('blue'),icon:customIcon('blue'),colorClass:'blue',row:0,col:6,walls:10,target:'row8',team:0,finished:!1},{id:2,name:'Green',customName:currentNames.green,color:customColor('green'),colorB:customColorB('green'),gradient:customGradientEnabled('green'),icon:customIcon('green'),colorClass:'green',row:8,col:2,walls:10,target:'row0',team:1,finished:!1},{id:3,name:'Yellow',customName:currentNames.yellow,color:customColor('yellow'),colorB:customColorB('yellow'),gradient:customGradientEnabled('yellow'),icon:customIcon('yellow'),colorClass:'yellow',row:8,col:6,walls:10,target:'row0',team:1,finished:!1},];turnOrder=[0,2,1,3]}
 function playerDisplayName(p){if(p.customName&&p.customName.trim())return p.customName.trim();const dict=translations[currentLang].players;if(gameMode==='2p'){return p.id===0?dict.player1:dict.player2}
 return dict[p.colorClass]||p.name}
 function teamName(team){return translations[currentLang].teamNames[team]}
 function currentPlayer(){return players[turn]}
-function initGame(mode){gameMode=mode;if(mode==='2p')setup2P();else setup4P();hWalls=Array.from({length:9},()=>Array(9).fill(!1));vWalls=Array.from({length:9},()=>Array(9).fill(!1));turnIndex=0;turn=turnOrder[0];gameOver=!1;history=[];undoStack=[];currentPage=0;uiMode='move';wallPreviewPos=null;pendingWallPos=null;isAnimating=!1;animData=null;wallAnimation=null;hideWallConfirm();infoMode.textContent=mode==='2p'?t('mode2p'):t('mode4p');infoObjective.textContent=mode==='2p'?t('objective2p'):t('objective4p');renderTopbar();updateBtnState();updateScores();updateActivePlayerUI();updateHistory();draw();startOverlay.style.display='none';appEl.classList.add('visible');sfxGameStart()}
+function initGame(mode){gameMode=mode;if(mode==='2p')setup2P();else setup4P();hWalls=Array.from({length:9},()=>Array(9).fill(!1));vWalls=Array.from({length:9},()=>Array(9).fill(!1));turnIndex=0;turn=turnOrder[0];gameOver=!1;history=[];undoStack=[];currentPage=0;uiMode='move';wallPreviewPos=null;pendingWallPos=null;isAnimating=!1;animData=null;wallAnimation=null;hideWallConfirm();infoMode.textContent=mode==='2p'?t('mode2p'):t('mode4p');infoObjective.textContent=mode==='2p'?t('objective2p'):t('objective4p');renderTopbar();updateBtnState();updateScores();updateActivePlayerUI();updateHistory();draw();startOverlay.style.display='none';appEl.classList.add('visible');
+// ===== اضافه شده برای مخفی کردن آسمان =====
+const starsContainer = document.getElementById('stars-container');
+if (starsContainer) {
+    starsContainer.style.display = 'none';
+}
+// =========================================
+sfxGameStart()}
 document.getElementById('btn-start-2p').onclick=()=>showNameEntry('2p');document.getElementById('btn-start-4p').onclick=()=>showNameEntry('4p');function showNameEntry(mode){selectedMode=mode;document.getElementById('mode-select-view').style.display='none';document.getElementById('name-entry-view').style.display='block';document.getElementById('name-fields-2p').style.display=mode==='2p'?'block':'none';document.getElementById('name-fields-4p').style.display=mode==='4p'?'block':'none';document.getElementById('input-name-p1').value=currentNames.p1;document.getElementById('input-name-p2').value=currentNames.p2;document.getElementById('input-name-red').value=currentNames.red;document.getElementById('input-name-blue').value=currentNames.blue;document.getElementById('input-name-green').value=currentNames.green;document.getElementById('input-name-yellow').value=currentNames.yellow;['p1','p2','red','blue','green','yellow'].forEach(refreshSwatchUI);applyStaticTranslations()}
 document.getElementById('btn-name-back').onclick=()=>{document.getElementById('name-entry-view').style.display='none';document.getElementById('mode-select-view').style.display='block'};document.getElementById('btn-name-confirm').onclick=()=>{if(selectedMode==='2p'){currentNames.p1=document.getElementById('input-name-p1').value.trim();currentNames.p2=document.getElementById('input-name-p2').value.trim();localStorage.setItem('barricade-name-p1',currentNames.p1);localStorage.setItem('barricade-name-p2',currentNames.p2)}else{currentNames.red=document.getElementById('input-name-red').value.trim();currentNames.blue=document.getElementById('input-name-blue').value.trim();currentNames.green=document.getElementById('input-name-green').value.trim();currentNames.yellow=document.getElementById('input-name-yellow').value.trim();localStorage.setItem('barricade-name-red',currentNames.red);localStorage.setItem('barricade-name-blue',currentNames.blue);localStorage.setItem('barricade-name-green',currentNames.green);localStorage.setItem('barricade-name-yellow',currentNames.yellow)}
 initGame(selectedMode)};btnHome.onclick=()=>{if(!confirm(t('confirmNewGame')))return;goHome()};btnRepeat.onclick=()=>{if(isAnimating)return;if(!confirm(t('confirmRepeat')))return;restartSameGame()};btnResign.onclick=()=>{if(gameOver||isAnimating)return;const player=currentPlayer();if(!confirm(fmt(t('confirmResign'),{name:playerDisplayName(player)})))return;gameOver=!0;pendingWallPos=null;wallPreviewPos=null;hideWallConfirm();updateActivePlayerUI();draw();if(gameMode==='2p'){const winner=players.find(p=>p.id!==player.id);setTimeout(()=>showGameOverDialog(winner,player),50)}else{const winTeam=player.team===0?1:0;setTimeout(()=>showGameOverDialog(null,null,winTeam),50)}};function renderTopbar(){topbarEl.innerHTML='';if(gameMode==='2p'){topbarEl.className='topbar mode-2p';const p0=players[0],p1=players[1];const card0=createPlayerCard(p0);const card1=createPlayerCard(p1);const vsBox=document.createElement('div');vsBox.className='bet-box';vsBox.innerHTML=`<div class="label">${t('match')}</div><div class="amount">${t('vs')}</div>`;topbarEl.append(card0,vsBox,card1)}else{topbarEl.className='topbar mode-4p';for(const p of players){topbarEl.appendChild(createPlayerCard(p))}}}
-function createPlayerCard(p){const card=document.createElement('div');card.className=`player-card ${p.colorClass}`;card.id=`p${p.id}-card`;const avatar=document.createElement('div');avatar.className=`avatar ${p.colorClass}`;avatar.style.background=gradientBg(p.color,p.colorB,p.gradient);setShapeClass(avatar,p.shape);const info=document.createElement('div');info.className='player-info';const nameDiv=document.createElement('div');nameDiv.className='name';nameDiv.textContent=playerDisplayName(p);info.appendChild(nameDiv);if(gameMode==='4p'){const teamDiv=document.createElement('div');teamDiv.className='team-label';teamDiv.textContent=p.team===0?t('teamA'):t('teamB');info.appendChild(teamDiv)}
+function createPlayerCard(p){const card=document.createElement('div');card.className=`player-card ${p.colorClass}`;card.id=`p${p.id}-card`;const avatar=document.createElement('div');avatar.className=`avatar ${p.colorClass}`;avatar.style.background=gradientBg(p.color,p.colorB,p.gradient);avatar.textContent=p.icon;const info=document.createElement('div');info.className='player-info';const nameDiv=document.createElement('div');nameDiv.className='name';nameDiv.textContent=playerDisplayName(p);info.appendChild(nameDiv);if(gameMode==='4p'){const teamDiv=document.createElement('div');teamDiv.className='team-label';teamDiv.textContent=p.team===0?t('teamA'):t('teamB');info.appendChild(teamDiv)}
 const scoreDiv=document.createElement('div');scoreDiv.className='score';const wallsSpan=document.createElement('span');wallsSpan.id=`p${p.id}-walls`;wallsSpan.textContent=p.walls;scoreDiv.append(wallsSpan,' / 10');info.appendChild(scoreDiv);const bar=document.createElement('div');bar.className='score-bar';const fill=document.createElement('div');fill.className=`fill ${p.colorClass}`;fill.id=`p${p.id}-fill`;fill.style.width='100%';fill.style.background=gradientBg(p.color,p.colorB,p.gradient);bar.appendChild(fill);info.appendChild(bar);if(gameMode==='2p'&&p.id===1)info.style.textAlign='right';card.append(avatar,info);return card}
 function getCoordStr(row,col){return colLetters[col]+(9-row)}
 function inBounds(r,c){return r>=0&&r<9&&c>=0&&c<9}
@@ -69,14 +77,55 @@ ctx.fillStyle='#acb8c8';ctx.shadowColor='rgba(255,255,255,0.1)';ctx.shadowBlur=6
 for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(vWalls[r][c]){let wp=1;if(wallAnimation&&!wallAnimation.isH&&wallAnimation.row===r&&wallAnimation.col===c)wp=wallAnimation.progress;ctx.globalAlpha=wp;ctx.beginPath();ctx.roundRect(padding+(c+1)*cellSize-3,padding+r*cellSize,8,cellSize,3);ctx.fill()}}
 ctx.globalAlpha=1;ctx.shadowBlur=0;for(const p of players)drawPiece(p,animData&&animData.playerId===p.id)}
 function hexToRgba(hex,alpha){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${alpha})`}
-function drawShapePath(cx,cy,r,shape){ctx.beginPath();switch(shape){case 'square':{const s=r*1.55;if(ctx.roundRect)ctx.roundRect(cx-s/2,cy-s/2,s,s,5);else ctx.rect(cx-s/2,cy-s/2,s,s);break}
-case 'diamond':ctx.moveTo(cx,cy-r*1.15);ctx.lineTo(cx+r*1.15,cy);ctx.lineTo(cx,cy+r*1.15);ctx.lineTo(cx-r*1.15,cy);ctx.closePath();break;case 'triangle':ctx.moveTo(cx,cy-r*1.2);ctx.lineTo(cx+r*1.05,cy+r*0.8);ctx.lineTo(cx-r*1.05,cy+r*0.8);ctx.closePath();break;case 'star':{const spikes=5,outerR=r*1.25,innerR=r*0.55;let rot=Math.PI/2*3;const step=Math.PI/spikes;ctx.moveTo(cx,cy-outerR);for(let i=0;i<spikes;i++){ctx.lineTo(cx+Math.cos(rot)*outerR,cy+Math.sin(rot)*outerR);rot+=step;ctx.lineTo(cx+Math.cos(rot)*innerR,cy+Math.sin(rot)*innerR);rot+=step}
-ctx.closePath();break}
-default:ctx.arc(cx,cy,r,0,2*Math.PI)}}
-function drawPiece(player,isAnimatingPiece){let x=padding+player.col*cellSize+cellSize/2;let y=padding+player.row*cellSize+cellSize/2;if(isAnimatingPiece&&animData){const p=Math.min(1,animData.progress);const ease=p<0.5?2*p*p:-1+(4-2*p)*p;x=animData.x1+(animData.x2-animData.x1)*ease;y=animData.y1+(animData.y2-animData.y1)*ease}
-const r=cellSize*0.32;drawShapePath(x,y,r,player.shape);ctx.shadowColor=player.color;ctx.shadowBlur=player.finished?22:15;if(player.gradient&&player.colorB){const grad=ctx.createLinearGradient(x-r,y-r,x+r,y+r);grad.addColorStop(0,player.color);grad.addColorStop(1,player.colorB);ctx.fillStyle=grad}else{ctx.fillStyle=player.color}
-ctx.fill();if(player.finished){ctx.lineWidth=2;ctx.strokeStyle='#ffffff';ctx.stroke()}
-ctx.shadowBlur=0}
+// ============================================================
+// تابع رسم مهره‌ها به سبک جدید (مربع گوشه‌گرد + آیکون شطرنج)
+// ============================================================
+function drawPiece(player, isAnimatingPiece){
+    let x = padding + player.col * cellSize + cellSize / 2;
+    let y = padding + player.row * cellSize + cellSize / 2;
+    if (isAnimatingPiece && animData) {
+        const p = Math.min(1, animData.progress);
+        const ease = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+        x = animData.x1 + (animData.x2 - animData.x1) * ease;
+        y = animData.y1 + (animData.y2 - animData.y1) * ease;
+    }
+    
+    const size = cellSize * 0.7;
+    const half = size / 2;
+    const radius = 8;
+    const cx = x - half;
+    const cy = y - half;
+
+    ctx.save();
+    ctx.shadowColor = player.color;
+    ctx.shadowBlur = 18;
+
+    // رنگ‌بندی گرادیان
+    let grad = ctx.createLinearGradient(cx, cy, cx + size, cy + size);
+    if (player.gradient && player.colorB) {
+        grad.addColorStop(0, player.color);
+        grad.addColorStop(1, player.colorB);
+    } else {
+        grad.addColorStop(0, player.color);
+        grad.addColorStop(1, player.color);
+    }
+    
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, size, size, radius);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // رسم آیکون در مرکز
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const iconSize = size * 0.65;
+    ctx.shadowBlur = 0; // حذف سایه از متن برای وضوح
+    ctx.font = `bold ${iconSize}px Arial, sans-serif`;
+    ctx.fillText(player.icon || '♙', x, y + 2);
+    ctx.restore();
+}
+
 if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){if(r>w/2)r=w/2;if(r>h/2)r=h/2;this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);return this}}
 function makeSnapshot(){return{players:players.map(p=>({...p})),hWalls:hWalls.map(a=>[...a]),vWalls:vWalls.map(a=>[...a]),turnIndex:turnIndex,turn:turn,historyLen:history.length,gameOver:gameOver}}
 btnUndo.onclick=()=>{if(isAnimating)return;if(undoStack.length===0){showToast(t('toastNothingToUndo'));return}
@@ -97,7 +146,14 @@ function showGameOverDialog(winnerPlayer,loserPlayer,winnerTeam){let winnerLabel
 goWinnerName.textContent=winnerLabel;goWinnerName.className='go-winner-name '+winnerColorClass;goWinnerName.style.color=winnerColor;goNameWinner.textContent=winnerLabel;goNameLoser.textContent=loserLabel;gameOverOverlay.classList.add('visible');sfxWin()}
 function hideGameOverOverlay(){gameOverOverlay.classList.remove('visible')}
 function restartSameGame(){hideGameOverOverlay();initGame(gameMode)}
-function goHome(){hideGameOverOverlay();document.getElementById('name-entry-view').style.display='none';document.getElementById('mode-select-view').style.display='block';startOverlay.style.display='flex';appEl.classList.remove('visible')}
+function goHome(){hideGameOverOverlay();document.getElementById('name-entry-view').style.display='none';document.getElementById('mode-select-view').style.display='block';startOverlay.style.display='flex';appEl.classList.remove('visible');
+// ===== اضافه شده برای نمایش مجدد آسمان =====
+const starsContainer = document.getElementById('stars-container');
+if (starsContainer) {
+    starsContainer.style.display = 'block'; // یا ''
+}
+// ==========================================
+}
 btnGoRepeat.onclick=restartSameGame;btnGoHome.onclick=goHome;function advanceTurn(){if(gameOver)return;let attempts=0;const allFinished=players.every(p=>p.finished);if(allFinished)return;do{turnIndex=(turnIndex+1)%turnOrder.length;attempts++}while(players[turnOrder[turnIndex]].finished&&attempts<=turnOrder.length);turn=turnOrder[turnIndex]}
 function updateActivePlayerUI(){for(const p of players){const card=document.getElementById(`p${p.id}-card`);if(!card)continue;card.classList.toggle('active',p.id===turn&&!gameOver);card.classList.toggle('finished',p.finished)}
 const player=currentPlayer();if(player){statusText.textContent=gameOver?t('gameOver'):`${playerDisplayName(player)}${t('turnSuffix')}`;statusText.className=gameOver?'':`text-${player.colorClass}`;statusText.style.color=gameOver?'':player.color;infoWalls.textContent=`${player.walls} / 10`}}
@@ -127,4 +183,138 @@ if(!pendingWallPos||pendingWallPos.row!==snap.row||pendingWallPos.col!==snap.col
 canvas.addEventListener('mousemove',(e)=>{if(gameOver||isAnimating)return;if(uiMode!=='move'&&!pendingWallPos){wallPreviewPos=getWallSnap(e)||null;draw()}});canvas.addEventListener('mousedown',(e)=>{if(gameOver||isAnimating)return;if(uiMode==='move'){const pos=getCellFromEvent(e);if(!pos)return;let col=Math.floor(pos.x/cellSize);let row=Math.floor(pos.y/cellSize);executeMove(row,col)}else{handleWallTap(e)}});canvas.addEventListener('mouseleave',()=>{if(!pendingWallPos){wallPreviewPos=null;draw()}});canvas.addEventListener('touchmove',(e)=>{e.preventDefault();if(gameOver||isAnimating)return;const touch=e.touches[0];if(uiMode!=='move'&&!pendingWallPos){wallPreviewPos=getWallSnap(touch)||null;draw()}},{passive:!1});canvas.addEventListener('touchend',(e)=>{e.preventDefault();if(gameOver||isAnimating)return;const touch=e.changedTouches[0];if(uiMode==='move'){const pos=getCellFromEvent(touch);if(!pos)return;let col=Math.floor(pos.x/cellSize);let row=Math.floor(pos.y/cellSize);executeMove(row,col)}else{handleWallTap(touch)}
 if(!pendingWallPos)wallPreviewPos=null;draw()},{passive:!1});btnMove.onclick=()=>{uiMode='move';wallPreviewPos=null;pendingWallPos=null;hideWallConfirm();updateBtnState();draw()};btnHWall.onclick=()=>{uiMode=(uiMode==='hwall'?'move':'hwall');wallPreviewPos=null;pendingWallPos=null;hideWallConfirm();updateBtnState();draw()};btnVWall.onclick=()=>{uiMode=(uiMode==='vwall'?'move':'vwall');wallPreviewPos=null;pendingWallPos=null;hideWallConfirm();updateBtnState();draw()};function animateLoop(){if(!isAnimating&&!gameOver&&uiMode==='move')draw();if(pendingWallPos&&!isAnimating)draw();requestAnimationFrame(animateLoop)}
 animateLoop()})()
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+// ================================================================
+// تابع ایجاد آسمان پرستاره با حرکت بی‌پایان (Space Scroller)
+// ================================================================
+// ================================================================
+// تابع ایجاد آسمان پرستاره با افکت‌های حرفه‌ای
+// ================================================================
+function initStarfield() {
+    // حذف کانتینر قبلی اگر وجود داشته باشد
+    const existing = document.getElementById('stars-container');
+    if (existing) existing.remove();
+
+    const container = document.createElement('div');
+    container.id = 'stars-container';
+    document.body.prepend(container);
+
+    // 1. لایه سحابی‌های رنگی (Nebula)
+    const nebulaLayer = document.createElement('div');
+    nebulaLayer.id = 'nebula-layer';
+    container.appendChild(nebulaLayer);
+
+    const nebulaColors = [
+        'rgba(255, 100, 150, 0.25)',
+        'rgba(100, 150, 255, 0.25)',
+        'rgba(255, 200, 100, 0.25)',
+        'rgba(200, 100, 255, 0.25)'
+    ];
+
+    for (let i = 0; i < 5; i++) {
+        const cloud = document.createElement('div');
+        cloud.className = 'nebula-cloud';
+        const size = 200 + Math.random() * 400;
+        cloud.style.width = size + 'px';
+        cloud.style.height = size + 'px';
+        cloud.style.background = nebulaColors[i % nebulaColors.length];
+        cloud.style.left = Math.random() * 80 + '%';
+        cloud.style.top = Math.random() * 80 + '%';
+        cloud.style.animationDelay = Math.random() * 20 + 's';
+        cloud.style.animationDuration = 30 + Math.random() * 30 + 's';
+        nebulaLayer.appendChild(cloud);
+    }
+
+    // 2. لایه غبار کیهانی (Dust)
+    const dustLayer = document.createElement('div');
+    dustLayer.id = 'dust-layer';
+    container.appendChild(dustLayer);
+
+    for (let i = 0; i < 80; i++) {
+        const dust = document.createElement('div');
+        dust.className = 'dust-particle';
+        const size = 2 + Math.random() * 6;
+        dust.style.width = size + 'px';
+        dust.style.height = size + 'px';
+        dust.style.left = Math.random() * 100 + '%';
+        dust.style.top = Math.random() * 100 + '%';
+        dust.style.background = `rgba(255,255,255,${0.1 + Math.random() * 0.3})`;
+        dust.style.animation = `floatDust ${10 + Math.random() * 20}s linear infinite alternate`;
+        dust.style.animationDelay = Math.random() * 10 + 's';
+        dustLayer.appendChild(dust);
+    }
+
+    // اضافه کردن keyframe برای حرکت غبار (اگر وجود نداشته باشد)
+    const dustStyle = document.createElement('style');
+    dustStyle.textContent = `
+        @keyframes floatDust {
+            0% { transform: translate(0, 0) scale(1); opacity: 0.2; }
+            100% { transform: translate(${20 + Math.random() * 40}px, ${-10 + Math.random() * 20}px) scale(1.4); opacity: 0.6; }
+        }
+    `;
+    document.head.appendChild(dustStyle);
+
+    // 3. لایه شهاب‌واره‌ها (Shooting Stars)
+    const shootingStarContainer = document.createElement('div');
+    shootingStarContainer.id = 'shooting-star-container';
+    container.appendChild(shootingStarContainer);
+
+    function createShootingStar() {
+        const star = document.createElement('div');
+        star.className = 'shooting-star';
+        const startX = Math.random() * 80 + 10;
+        const startY = Math.random() * 40 + 5;
+        star.style.left = startX + '%';
+        star.style.top = startY + '%';
+        star.style.transform = `rotate(${-20 + Math.random() * 30}deg)`;
+        star.style.opacity = '1';
+        const duration = 1 + Math.random() * 2;
+        star.style.animation = `shoot ${duration}s ease-out forwards`;
+        shootingStarContainer.appendChild(star);
+        setTimeout(() => star.remove(), duration * 1000);
+    }
+
+    // تولید شهاب‌واره به‌صورت تصادفی
+    setInterval(() => {
+        if (Math.random() < 0.3) {
+            createShootingStar();
+        }
+    }, 2000);
+
+    // اضافه کردن keyframe برای حرکت شهاب‌واره
+    const shootStyle = document.createElement('style');
+    shootStyle.textContent = `
+        @keyframes shoot {
+            0% { opacity: 0; transform: translate(0, 0) rotate(-25deg); }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-200px, 200px) rotate(-25deg); }
+        }
+    `;
+    document.head.appendChild(shootStyle);
+
+    // 4. ستاره‌های چشمک‌زن (Twinkling Stars)
+    const numStars = 300;
+    for (let i = 0; i < numStars; i++) {
+        const star = document.createElement('div');
+        const sizeRand = Math.random();
+        let className = 'star';
+        if (sizeRand < 0.7) className += ' star-small';
+        else if (sizeRand < 0.9) className += ' star-medium';
+        else className += ' star-large';
+
+        // ۲۰٪ شانس رنگ متفاوت
+        if (Math.random() < 0.2) {
+            className += Math.random() < 0.5 ? ' star-color-blue' : ' star-color-yellow';
+        }
+
+        star.className = className;
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 5 + 's';
+        star.style.animationDuration = (2 + Math.random() * 4) + 's';
+        container.appendChild(star);
+    }
+}
+
+// اجرای تابع برای نمایش آسمان
+initStarfield();
